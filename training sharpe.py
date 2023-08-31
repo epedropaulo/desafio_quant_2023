@@ -10,6 +10,7 @@ from stable_baselines3.common.callbacks import EvalCallback
 
 
 periodo_permitido = ('2009-12-30','2022-12-30')
+
     
 
 def GetIndex(*args):
@@ -29,7 +30,7 @@ def GetIndex(*args):
 path_diario = './assets/1d/'
 file = './assets/United States 10-Year Bond Yield Historical Data.csv'
 
-close_price_free = pd.read_csv(file).Price
+close_price_free = pd.read_csv(file).Price.loc[periodo_permitido[0]:periodo_permitido[1]]
 risk_free_rate = close_price_free.mean()/100
 daily_risk_free = (risk_free_rate+1)**(1/252) -1
 
@@ -42,25 +43,26 @@ for ativo in ativos:
 
 close_prices = {}
 for k in ativosOHLC.keys():
-  close_prices[k] = ativosOHLC[k].Close
+  close_prices[k] = ativosOHLC[k].Close.loc[periodo_permitido[0]:periodo_permitido[1]]
 
 
 df_fechamento = pd.DataFrame(close_prices).iloc[:-360]
 
-normalized_fech = df_fechamento.apply(lambda row: NormalizeWindow(row)).dropna()
-macd = df_fechamento.apply(lambda row: MACD(row)[0]).dropna()
-rsi = df_fechamento.apply(lambda row: RSI(row)).dropna()
-ewma_diff = df_fechamento.apply(lambda row: EWMA(row,20) - EWMA(row,5)).dropna()
-ddd = df_fechamento.apply(lambda row: MDD(row,window=26)[0]).dropna()
-mdd = df_fechamento.apply(lambda row: MDD(row,window=26)[0]).rolling(window=26).min().dropna()
+normalized_fech = df_fechamento.apply(lambda row: NormalizeWindow(row)).shift(1).dropna()
+macd = df_fechamento.apply(lambda row: MACD(row)[0]).shift(1).dropna()
+rsi = df_fechamento.apply(lambda row: RSI(row)).shift(1).dropna()
+ewma_diff = df_fechamento.apply(lambda row: EWMA(row,20) - EWMA(row,5)).shift(1).dropna()
+ddd = df_fechamento.apply(lambda row: MDD(row,window=26)[0]).shift(1).dropna()
+mdd = df_fechamento.apply(lambda row: MDD(row,window=26)[0]).rolling(window=26).min().shift(1).dropna()
 df_fechamento,normalized_fech,macd,rsi,ewma_diff,ddd,mdd =  GetIndex(df_fechamento,normalized_fech, macd, rsi, ewma_diff,ddd,mdd)
 
 
 for val in [df_fechamento,*[normalized_fech,macd,rsi,ewma_diff,ddd,mdd]]:
   print(len(val))
 
-env = TradingEnv(df_fechamento,[normalized_fech,macd,rsi,ewma_diff,ddd,mdd],daily_risk_free,'r')
+env = TradingEnv(df_fechamento,[normalized_fech,macd,rsi,ewma_diff,ddd,mdd],daily_risk_free,'s',long_only=False)
 
+print(df_fechamento)
 
 save_path = os.path.join('Training', 'Saved Models')
 log_path = os.path.join('Training', 'Logs')
@@ -77,7 +79,7 @@ model = PPO("MlpPolicy",
 
 model.learn(total_timesteps=2_000_000,progress_bar=True,callback=eval_callback)
 
-model.save('./Training/Saved Models/trading_6.zip')
+model.save('./Training/Saved Models/trading_sharpe_4.zip')
 
 
 
